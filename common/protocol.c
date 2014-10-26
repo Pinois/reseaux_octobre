@@ -7,7 +7,7 @@
 
 static char next_seq(char seq);
 static void init_payload(char* payload);
-static uLong compute_crc(frame*  frame);
+static uLong compute_crc(frame  frame);
 
 int is_free_window(window* window, size_t len)
 {
@@ -56,7 +56,7 @@ void unserialize(char * data, frame *frame)
 
 int valid_frame(frame frame)
 {
-  if (frame.crc != compute_crc(&frame))
+  if (frame.crc != compute_crc(frame))
   {
     return 0;
   }
@@ -70,12 +70,28 @@ int valid_frame(frame frame)
         return 0;
       }
     }
-
     if (frame.window != 0)
     {
       return 0;
     }
-  } else {
+  } else if (frame.type == 2)
+  {
+    if (frame.length != 0)
+    {
+      return 0;
+    }
+    if (strlen(frame.payload) != 0)
+    {
+      return 0;
+    }
+  } else
+    return 0;
+  {
+  }
+
+  if (frame.crc != compute_crc(frame))
+  {
+    return 0;
   }
 
   return 1;
@@ -91,7 +107,7 @@ void create_data_frame(char seq, char* data, frame* frame)
   init_payload(frame->payload);
   memcpy(frame->payload, data, frame->length + 1);
 
-  frame->crc = compute_crc(frame);
+  frame->crc = compute_crc(*frame);
 }
 
 int create_ack_frame(char seq, uint16_t window , frame* frame)
@@ -105,7 +121,7 @@ int create_ack_frame(char seq, uint16_t window , frame* frame)
   frame->seq = next_seq(seq);
   frame->length = 0;
   init_payload(frame->payload);
-  frame->crc = compute_crc(frame);
+  frame->crc = compute_crc(*frame);
 
   return 1;
 }
@@ -120,10 +136,10 @@ void init_payload(char * payload)
   memset(payload, 0, MAX_PAYLOAD_SIZE);
 }
 
-uLong compute_crc(frame * frame)
+uLong compute_crc(frame frame)
 {
   uLong crc = crc32(0L, Z_NULL, 0);
-  crc = crc32(crc, (Bytef*) frame, sizeof(frame) - sizeof(crc));
+  crc = crc32(crc, (Bytef*) &frame, sizeof(frame) - sizeof(crc));
 
   return crc;
 }
