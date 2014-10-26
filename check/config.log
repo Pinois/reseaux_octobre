@@ -739,7 +739,7 @@ conftest.c:34:22: warning: null argument where non-null required (argument 3) [-
 conftest.c:32:27: warning: 'th' is used uninitialized in this function [-Wuninitialized]
  pthread_t th; pthread_join(th, 0);
                            ^
-/tmp/ccwzgIjJ.o: In function `main':
+/tmp/ccr0D683.o: In function `main':
 /home/damiens/workspace/Reseau_Oct/check/conftest.c:32: undefined reference to `pthread_join'
 /home/damiens/workspace/Reseau_Oct/check/conftest.c:33: undefined reference to `__pthread_register_cancel'
 /home/damiens/workspace/Reseau_Oct/check/conftest.c:34: undefined reference to `pthread_create'
@@ -2696,10 +2696,12 @@ config.status:1210: creating src/Makefile
 config.status:1210: creating tests/Makefile
 config.status:1210: creating tests/test_vars
 config.status:1210: creating config.h
+config.status:1391: config.h is unchanged
 config.status:1439: executing depfiles commands
 config.status:1439: executing libtool commands
 config.status:1439: executing check_stdint.h commands
 config.status:2172: creating check_stdint.h : _CHECK_CHECK_STDINT_H
+config.status:2604: check_stdint.h is unchanged
 config.status:1439: executing checkmk-x commands
 
 ## ---------------- ##

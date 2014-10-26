@@ -1,19 +1,21 @@
-#ifndef __PROTOCOL_H__
-#define __PROTOCOL_H__
+#ifndef protocol_h 
+#define protocol_h
 
+#include <stdint.h>
 #include <stddef.h>
 #include <time.h>
 #include "../zlib/zlib.h" 
 
-#define MAX_WINDOW_SIZE 31
+#define MAX_WINDOW_SIZE 32 
+#define MAX_PAYLOAD_SIZE 512
 
 typedef struct
 {
-    unsigned int type:3;
-    unsigned int window:5;
-    unsigned int seq:8;
-    unsigned int length;
-    char payload [512];
+    char type:3;
+    char window:5;
+    char seq;
+    uint16_t length;
+    char payload [MAX_PAYLOAD_SIZE];
     ulong crc;
 }frame;
 
@@ -29,10 +31,20 @@ typedef struct
     timer timer;
 }window;
 
-int is_free_window(window window[]);
+extern void create_data_frame(char seq, char* data, frame* frame);
 
-int add_frame_to_window(frame frame, window window[]);
+extern int create_ack_frame(char seq, uint16_t window , frame* frame);
 
-void clean_window(frame frame, window to_clean[], window removed[], size_t* len);
+extern int valid_frame(frame frame);
+
+extern void serialize(frame, char*);
+
+extern void unserialize(char*, frame*);
+
+extern int is_free_window(window*, size_t len);
+
+extern int add_frame_to_window(frame, window*);
+
+extern void clean_window(frame, window*, window* , size_t*);
 
 #endif
