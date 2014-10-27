@@ -10,6 +10,8 @@ clean:
 	$(MAKE) receiver-clean
 	$(MAKE) -C common clean
 	$(MAKE) -C t clean
+	$(MAKE) test-clean
+	$(MAKE) check-clean
 
 test:
 	$(MAKE) -C common
@@ -18,10 +20,10 @@ test:
 	./tests
 
 zlib-compile:
-	cd zlib; ./configure; make; cd -
+	cd zlib && ./configure && make && cd -
 
 zlib-clean:
-	cd zlib; make clean; cd -
+	cd zlib && make clean && cd -
 
 sender-compile:
 	gcc -c sender.c
@@ -36,3 +38,13 @@ receiver-compile:
 
 receiver-clean:
 	-rm receiver.o receiver
+
+test-clean:
+	-rm tests
+
+check-install:
+	cd check && ./configure && make && make check && sudo make install && cd -
+
+check-clean:
+	cd check && make clean && cd -
+
