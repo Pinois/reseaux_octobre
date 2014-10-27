@@ -57,6 +57,37 @@ START_TEST(test_frame_serialization)
   ck_assert_int_eq(frame1.crc,frame2.crc);
 END_TEST
 
+START_TEST(test_window)
+  frame frame1, frame2, frame3,frame4,frame5;
+  char data[MAX_PAYLOAD_SIZE] = "abcdefghijklmnopqrstuvwxyz";
+  window wdw[MAX_WINDOW_SIZE/2];
+  window removed[MAX_WINDOW_SIZE/2];
+  size_t len = 0;
+  
+  init_window(wdw);
+  init_window(removed);
+  create_data_frame(0, data, &frame1);
+  create_data_frame(2, data, &frame2);
+  create_data_frame(1, data, &frame3);
+  create_data_frame(4, data, &frame5);
+  create_data_frame(5, data, &frame5);
+  ck_assert(is_free_window(wdw, 1));
+  ck_assert(is_free_window(wdw, 16));
+  ck_assert(!is_free_window(wdw, 17));
+  ck_assert(add_frame_to_window(frame1, wdw));
+  ck_assert(!is_free_window(wdw, 1));
+  ck_assert(is_free_window(wdw, 2));
+  ck_assert(add_frame_to_window(frame2, wdw));
+  ck_assert(add_frame_to_window(frame3, wdw));
+  ck_assert(add_frame_to_window(frame4, wdw));
+  ck_assert(add_frame_to_window(frame5, wdw));
+  ck_assert(is_free_window(wdw, 6));
+  ck_assert(!is_free_window(wdw, 5));
+  clean_window(0, wdw, removed, &len);
+  ck_assert(is_free_window(wdw, 3));
+  ck_assert(!is_free_window(wdw, 2));
+END_TEST
+
 Suite * protocol_suite(void)
 {
   Suite *s;
@@ -70,6 +101,7 @@ Suite * protocol_suite(void)
   tcase_add_test(tc_core, test_ack_create);
   tcase_add_test(tc_core, test_frame_crc);
   tcase_add_test(tc_core, test_frame_serialization);
+  tcase_add_test(tc_core, test_window);
   suite_add_tcase(s, tc_core);
 
   return s;

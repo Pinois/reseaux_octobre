@@ -1,26 +1,118 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <arpa/inet.h>
 #include <zlib.h>
 #include "protocol.h"
 
+static int is_empty_window(window window);
+static int is_empty_frame(frame frame);
+static int is_empty_timer(timer timer);
 static char next_seq(char seq);
 static void init_payload(char* payload);
+static void init_frame(frame* frame);
+static void init_timer(timer * timer);
 static uLong compute_crc(frame  frame);
 
-int is_free_window(window* window, size_t len)
+int is_free_window(window* wdw, size_t len)
 {
+  return is_empty_window(*(wdw + (len-1)));
+}
+
+int is_empty_window(window window)
+{
+  return is_empty_frame(window.frame) && is_empty_timer(window.timer);
+}
+
+int is_empty_frame(frame frame)
+{
+  return frame.type == 0 &&
+         frame.window == 0 &&
+         frame.seq == 0 &&
+         (strcmp(frame.payload, "") == 0) &&
+         frame.crc == 0;
+}
+
+int is_empty_timer(timer timer)
+{
+  return timer.timerid == 0 &&
+         timer.counter == 0;
+}
+
+void init_window(window * window)
+{
+  int i;
+  for (i = 0; i < MAX_WINDOW_SIZE/2; i++)
+  {
+    init_frame(&window[i].frame);
+    init_timer(&window[i].timer);
+  }
+}
+
+void init_frame(frame * frame) 
+{
+  frame->type = 0;
+  frame->window = 0;
+  frame->seq = 0;
+  init_payload(frame->payload);
+  frame->crc = 0;
+}
+
+void init_timer(timer * timer) 
+{
+  timer->timerid = 0;
+  timer->counter = 0;
+}
+
+int add_frame_to_window(frame frame, window* wdw)
+{
+  int i = MAX_WINDOW_SIZE/2;
+  if (!is_empty_window(*(wdw + (i - 1)))) return 0;
+  while (i > 0 && is_empty_window(*(wdw + (i - 1))))
+  {
+    i--;
+  }
+  memcpy(&wdw[i].frame, &frame, sizeof (frame));
+
   return 1;
 }
 
-int add_frame_to_window(frame frame, window window[])
+void clean_window(char seq, window to_clean[], window removed[], size_t* len)
 {
-  return 1;
-}
+  
+  int i = 0;
+  while (i < MAX_WINDOW_SIZE/2 && !is_empty_window(*(to_clean + i)))
+  {
+    if (seq == to_clean[i].frame.seq)
+    {
+      memcpy(&removed[*len], &to_clean[i], sizeof(window));
+      (*len)++;
+      clean_window(seq+1, to_clean, removed, len);
+      init_frame(&to_clean[i].frame);
+      init_timer(&to_clean[i].timer);
+    }
+    i++;
+  }
 
-void clean_window(frame frame, window to_clean[], window removed[], size_t* len)
-{
+  window temp[MAX_WINDOW_SIZE];
+  init_window(temp);
+ 
+  int j; 
+  for (i=0, j=0; i < MAX_WINDOW_SIZE/2; i++)
+  {
+    if (!is_empty_window(to_clean[i]))
+    {
+      temp[j] = to_clean[i];
+      j++;
+    }
+  }
+
+  init_window(to_clean);
+  for (i=0; i < MAX_WINDOW_SIZE/2; i++)
+  {
+    to_clean[i] = temp[i];
+  }
 }
 
 void serialize(frame frame, char* data)
@@ -133,7 +225,7 @@ char next_seq(char seq)
 
 void init_payload(char * payload)
 {
-  memset(payload, 0, MAX_PAYLOAD_SIZE);
+  memset(payload, '\0', MAX_PAYLOAD_SIZE);
 }
 
 uLong compute_crc(frame frame)

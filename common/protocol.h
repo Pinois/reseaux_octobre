@@ -41,10 +41,12 @@ extern void serialize(frame, char*);
 
 extern void unserialize(char*, frame*);
 
-extern int is_free_window(window*, size_t len);
+extern int is_free_window(window* window, size_t len);
 
-extern int add_frame_to_window(frame, window*);
+extern int add_frame_to_window(frame frame, window* window);
 
-extern void clean_window(frame, window*, window* , size_t*);
+extern void clean_window(char seq, window* to_clean, window* removed , size_t* len);
+
+extern void init_window(window * window);
 
 #endif
