@@ -126,12 +126,20 @@ int main (int argc, char **argv)
       int i;
       for (i=0; i<len ; i++)
       {
-        fwrite(to_write[i].frame.payload, sizeof(char), to_write[i].frame.length, fd);
+        frame temp = to_write[i].frame; 
+        if (fwrite(to_write[i].frame.payload, sizeof(char), temp.length, fd) != temp.length)
+        {
+          printf("Writing to file failed !\n");
+          goto end;
+        }
+        if (temp.length < MAX_PAYLOAD_SIZE)
+          goto end;
       }
       seq += len;
     }
   }
 
+end:
   close(sfd);
   fclose(fd);
 

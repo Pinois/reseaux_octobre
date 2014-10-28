@@ -114,9 +114,8 @@ int main (int argc, char **argv)
 
   freeaddrinfo(result);
 
-  while(!feof(fd))
+  while((len = fread(buffer, sizeof(char),MAX_PAYLOAD_SIZE, fd)) != 0 )
   {
-    len = fread(buffer, sizeof(char),MAX_PAYLOAD_SIZE, fd);
     // check timer and resend !
     create_data_frame(seq, buffer, len, &data);
     if (is_free_window(wdw, MAX_WINDOW_SIZE))
@@ -143,8 +142,8 @@ int main (int argc, char **argv)
   if(valid_frame(ack))
   {
     init_window(removed);
-    int rem_len = 0;
-    clean_window(ack.seq, wdw, removed, &rem_len, SEND);
+    size_t rem_len = 0;
+    clean_window(ack.seq - 1, wdw, removed, &rem_len, SEND);
   }
 
   close(sfd);
