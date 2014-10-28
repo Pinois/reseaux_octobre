@@ -9,7 +9,7 @@
 static int is_empty_window(window window);
 static int is_empty_frame(frame frame);
 static int is_empty_timer(timer timer);
-static char next_seq(char seq);
+static char get_seq(char seq);
 static void init_payload(char* payload);
 static void init_frame(frame* frame);
 static void init_timer(timer * timer);
@@ -43,7 +43,7 @@ int is_empty_timer(timer timer)
 void init_window(window * window)
 {
   int i;
-  for (i = 0; i < MAX_WINDOW_SIZE/2; i++)
+  for (i = 0; i < MAX_WINDOW_SIZE; i++)
   {
     init_frame(&window[i].frame);
     init_timer(&window[i].timer);
@@ -67,7 +67,7 @@ void init_timer(timer * timer)
 
 int add_frame_to_window(frame frame, window* wdw)
 {
-  int i = MAX_WINDOW_SIZE/2;
+  int i = MAX_WINDOW_SIZE;
   if (!is_empty_window(*(wdw + (i - 1)))) return 0;
   while (i > 0 && is_empty_window(*(wdw + (i - 1))))
   {
@@ -78,19 +78,31 @@ int add_frame_to_window(frame frame, window* wdw)
   return 1;
 }
 
-void clean_window(char seq, window to_clean[], window removed[], size_t* len)
+void clean_window(char seq, window to_clean[], window removed[], size_t* len, int flags)
 {
-  
+  seq = get_seq(seq);
   int i = 0;
-  while (i < MAX_WINDOW_SIZE/2 && !is_empty_window(*(to_clean + i)))
+  while (i < MAX_WINDOW_SIZE)
   {
-    if (seq == to_clean[i].frame.seq)
+    if (flags == RECV)
     {
-      memcpy(&removed[*len], &to_clean[i], sizeof(window));
-      (*len)++;
-      clean_window(seq+1, to_clean, removed, len);
-      init_frame(&to_clean[i].frame);
-      init_timer(&to_clean[i].timer);
+      if (!is_empty_frame(to_clean[i].frame) && seq == to_clean[i].frame.seq)
+      {
+        memcpy(&removed[*len], &to_clean[i], sizeof(window));
+	init_frame(&to_clean[i].frame);
+        init_timer(&to_clean[i].timer);
+        (*len)++;
+        clean_window(get_seq(seq+1), to_clean, removed, len, RECV);
+      }
+    }else {
+      if (!is_empty_frame(to_clean[i].frame) && seq == to_clean[i].frame.seq)
+      {
+        memcpy(&removed[*len], &to_clean[i], sizeof(window));
+        init_frame(&to_clean[i].frame);
+        init_timer(&to_clean[i].timer);
+        (*len)++;
+        clean_window(get_seq(seq-1), to_clean, removed, len, SEND);
+       }
     }
     i++;
   }
@@ -99,7 +111,7 @@ void clean_window(char seq, window to_clean[], window removed[], size_t* len)
   init_window(temp);
  
   int j; 
-  for (i=0, j=0; i < MAX_WINDOW_SIZE/2; i++)
+  for (i=0, j=0; i < MAX_WINDOW_SIZE; i++)
   {
     if (!is_empty_window(to_clean[i]))
     {
@@ -109,7 +121,7 @@ void clean_window(char seq, window to_clean[], window removed[], size_t* len)
   }
 
   init_window(to_clean);
-  for (i=0; i < MAX_WINDOW_SIZE/2; i++)
+  for (i=0; i < MAX_WINDOW_SIZE; i++)
   {
     to_clean[i] = temp[i];
   }
@@ -148,53 +160,40 @@ void unserialize(char * data, frame *frame)
 
 int valid_frame(frame frame)
 {
-  if (frame.crc != compute_crc(frame))
-  {
-    return 0;
-  }
+  //if (frame.crc != compute_crc(frame))
+  //{
+  //  return 0;
+  //}
   
   if (frame.type ==  1)
   {
-    if (frame.length != MAX_PAYLOAD_SIZE)
-    {
-      if (frame.length != strlen(frame.payload))
-      {
-        return 0;
-      }
-    }
     if (frame.window != 0)
     {
       return 0;
     }
-  } else if (frame.type == 2)
-  {
-    if (frame.length != 0)
-    {
-      return 0;
-    }
-    if (strlen(frame.payload) != 0)
-    {
-      return 0;
-    }
-  } else
-    return 0;
-  {
-  }
-
-  if (frame.crc != compute_crc(frame))
-  {
-    return 0;
+  } else if (frame.type == 2) {
+//    if (frame.length != 0)
+//    {
+//      return 0;
+//    }
+//    if (strlen(frame.payload) != 0)
+//    {
+//      return 0;
+//    }
+//  } else
+//    return 0;
+//  {
   }
 
   return 1;
 }
 
-void create_data_frame(char seq, char* data, frame* frame)
+void create_data_frame(char seq, char* data, uint16_t len, frame* frame)
 {
   frame->type = 1;
   frame->window = 0;
-  frame->seq = next_seq(seq);
-  frame->length = strlen(data);
+  frame->seq = get_seq(seq);
+  frame->length = len;
 
   init_payload(frame->payload);
   memcpy(frame->payload, data, frame->length + 1);
@@ -202,25 +201,19 @@ void create_data_frame(char seq, char* data, frame* frame)
   frame->crc = compute_crc(*frame);
 }
 
-int create_ack_frame(char seq, uint16_t window , frame* frame)
+void create_ack_frame(char seq, frame* frame)
 {
-  if (window >= MAX_WINDOW_SIZE / 2 )
-  {
-    return 0;
-  } 
   frame->type = 2;
-  frame->window = window;
-  frame->seq = next_seq(seq);
+  frame->window = MAX_WINDOW_SIZE - 1;
+  frame->seq = get_seq(seq);
   frame->length = 0;
   init_payload(frame->payload);
   frame->crc = compute_crc(*frame);
-
-  return 1;
 }
 
-char next_seq(char seq)
+char get_seq(char seq)
 {
-  return seq % (MAX_WINDOW_SIZE/2);
+  return seq % (MAX_WINDOW_SIZE * 2);
 }
 
 void init_payload(char * payload)
