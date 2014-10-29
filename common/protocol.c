@@ -15,6 +15,8 @@ static void init_payload(char* payload);
 static void init_frame(frame* frame);
 static void init_timer(timer * timer);
 static uLong compute_crc(frame  frame);
+static void clean_recv_window(uint8_t seq, window* to_clean, window* removed, int* len);
+static void clean_send_window(uint8_t seq, window* to_clean, window* removed, int* len);
 
 int frame_in_window(window* wdw, frame frm) 
 {
@@ -118,39 +120,53 @@ int add_frame_to_window(frame frame, window* wdw)
   return 1;
 }
 
-void clean_window(uint8_t seq, window* to_clean, window* removed, int* len, int flags)
+void clean_recv_window(uint8_t seq, window* to_clean, window* removed, int* len)
 {
   seq = get_seq(seq);
   int i = 0;
-  int j = 0;
   while (i < MAX_WINDOW_SIZE)
   {
-    if (flags == RECV)
+    if (!is_empty_frame(to_clean[i].frame) && seq == to_clean[i].frame.seq)
     {
-      if (!is_empty_frame(to_clean[i].frame) && seq == to_clean[i].frame.seq)
-      {
-        memcpy(&removed[*len] , &to_clean[i], sizeof(window)+1);
-	init_frame(&to_clean[i].frame);
-        init_timer(&to_clean[i].timer);
-        (*len)++;
-        clean_window(get_seq(seq+1), to_clean, removed, len, RECV);
-      }
-    }else {
-      if (!is_empty_frame(to_clean[i].frame) && seq == to_clean[i].frame.seq)
-      {
-        memcpy(&removed[*len], &to_clean[i], sizeof(window));
-        init_frame(&to_clean[i].frame);
-        init_timer(&to_clean[i].timer);
-        (*len)++;
-        clean_window(get_seq(seq-1), to_clean, removed, len, SEND);
-       }
+      memcpy(&removed[*len] , &to_clean[i], sizeof(window)+1);
+      init_frame(&to_clean[i].frame);
+      init_timer(&to_clean[i].timer);
+      (*len)++;
+      clean_recv_window(get_seq(seq+1), to_clean, removed, len);
     }
     i++;
   }
+}
+
+void clean_send_window(uint8_t seq, window* to_clean, window* removed, int* len)
+{
+  seq = get_seq(seq);
+  int i = 0;
+  while (i < MAX_WINDOW_SIZE)
+  {
+    if (!is_empty_frame(to_clean[i].frame) && seq == to_clean[i].frame.seq)
+    {
+      memcpy(&removed[*len], &to_clean[i], sizeof(window));
+      init_frame(&to_clean[i].frame);
+      init_timer(&to_clean[i].timer);
+      (*len)++;
+      clean_send_window(get_seq(seq-1), to_clean, removed, len);
+    }
+    i++;
+  }
+}
+
+void clean_window(uint8_t seq, window* to_clean, window* removed, int* len, int flags)
+{
+  if (flags == RECV)
+    clean_recv_window(seq, to_clean, removed, len);
+  else if (flags == SEND)
+    clean_send_window(seq, to_clean, removed, len);
 
   window temp[MAX_WINDOW_SIZE];
   init_window(temp);
- 
+
+  int i,j; 
   for (i=0, j=0; i < MAX_WINDOW_SIZE; i++)
   {
     if (!is_empty_window(to_clean[i]))
