@@ -9,7 +9,7 @@ START_TEST(test_frame_create)
   create_data_frame(32, data, strlen(data), &frame);
   ck_assert_int_eq(frame.type,1);
   ck_assert_int_eq(frame.window,0);
-  ck_assert_int_eq(frame.seq,32);
+  ck_assert_int_eq(frame.seq,0);
   ck_assert_int_eq(frame.length,strlen(data));
   ck_assert_str_eq(frame.payload,data);
   ck_assert(valid_frame(frame));
@@ -29,7 +29,7 @@ START_TEST(test_ack_create)
   create_ack_frame(20, &frame1);
 
   ck_assert_int_eq(frame1.type,2);
-  ck_assert_int_eq(frame1.window, -1); //is the same as 31
+  ck_assert_int_eq(frame1.window, 15);
   ck_assert_int_eq(frame1.seq,20);
   ck_assert_int_eq(frame1.length,0);
   ck_assert_str_eq(frame1.payload,"");
@@ -70,23 +70,21 @@ START_TEST(test_window)
   char data[MAX_PAYLOAD_SIZE] = "abcdefghijklmnopqrstuvwxyz";
   window wdw[MAX_WINDOW_SIZE];
   window removed[MAX_WINDOW_SIZE];
-  size_t len = 0;
-  int i;
+  int len = 0;
   
   init_window(wdw);
-  init_window(removed);
   create_data_frame(0, data, strlen(data), &frame1);
   create_data_frame(2, data, strlen(data), &frame2);
   create_data_frame(1, data, strlen(data), &frame3);
   create_data_frame(4, data, strlen(data), &frame4);
   create_data_frame(5, data, strlen(data), &frame5);
   create_data_frame(7, data, strlen(data), &frame6);
-  ck_assert(is_free_window(wdw, 1));
-  ck_assert(is_free_window(wdw, 16));
-  ck_assert(!is_free_window(wdw, 33));
+  ck_assert(is_free_window(wdw, 0));
+  ck_assert(is_free_window(wdw, 15));
+  ck_assert(!is_free_window(wdw, 16));
   ck_assert(add_frame_to_window(frame1, wdw));
-  ck_assert(!is_free_window(wdw, 1));
-  ck_assert(is_free_window(wdw, 2));
+  ck_assert(!is_free_window(wdw, 0));
+  ck_assert(is_free_window(wdw, 1));
   ck_assert(add_frame_to_window(frame2, wdw));
   ck_assert(frame_in_window(wdw, frame2));
   ck_assert(!frame_in_window(wdw, frame3));
@@ -94,16 +92,29 @@ START_TEST(test_window)
   ck_assert(add_frame_to_window(frame6, wdw));
   ck_assert(add_frame_to_window(frame4, wdw));
   ck_assert(add_frame_to_window(frame5, wdw));
-  ck_assert(is_free_window(wdw, 7));
-  ck_assert(!is_free_window(wdw, 6));
+  ck_assert(is_free_window(wdw, 6));
+  ck_assert(!is_free_window(wdw, 5));
+  init_window(removed);
   clean_window(0, wdw, removed, &len, RECV);
-  ck_assert(is_free_window(wdw, 4));
-  ck_assert(!is_free_window(wdw, 3));
+  ck_assert_int_eq(len, 3);
+  ck_assert(is_free_window(removed, 3));
+  ck_assert(!is_free_window(removed, 2));
+  ck_assert(is_free_window(wdw, 3));
+  ck_assert(!is_free_window(wdw, 2));
   init_window(removed);
   len = 0;
   clean_window(5, wdw, removed, &len, SEND);
-  ck_assert(is_free_window(wdw, 2));
-  ck_assert(!is_free_window(wdw, 1));
+  ck_assert_int_eq(len, 2);
+  ck_assert(is_free_window(removed, 2));
+  ck_assert(!is_free_window(removed, 1));
+  ck_assert(!is_free_window(wdw, 0));
+  len = 0;
+  init_window(removed);
+  clean_window(7, wdw, removed, &len, SEND);
+  ck_assert_int_eq(len, 1);
+  ck_assert(is_free_window(removed, 1));
+  ck_assert(!is_free_window(removed, 0));
+  
 END_TEST
 
 Suite * protocol_suite(void)

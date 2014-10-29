@@ -10,7 +10,7 @@
 static int is_empty_window(window window);
 static int is_empty_frame(frame frame);
 static int is_empty_timer(timer timer);
-static char get_seq(char seq);
+static char get_seq(uint8_t seq);
 static void init_payload(char* payload);
 static void init_frame(frame* frame);
 static void init_timer(timer * timer);
@@ -52,9 +52,9 @@ int timer_reached(window* wdw, window* resend, int* len)
   return *len > 0;
 }
 
-int is_free_window(window* wdw, size_t len)
+int is_free_window(window* wdw, size_t ind)
 {
-  return is_empty_window(*(wdw + (len-1)));
+  return is_empty_window(*(wdw + (ind)));
 }
 
 int is_empty_window(window window)
@@ -104,11 +104,11 @@ void init_timer(timer * timer)
 
 int add_frame_to_window(frame frame, window* wdw)
 {
-  int i = MAX_WINDOW_SIZE;
+  int i = 0;
   if (!is_empty_window(*(wdw + (i - 1)))) return 0;
-  while (i > 0 && is_empty_window(*(wdw + (i - 1))))
+  while (i < MAX_WINDOW_SIZE && !is_empty_window(*(wdw +i)))
   {
-    i--;
+    i++;
   }
   memcpy(&wdw[i].frame, &frame, sizeof (frame));
 
@@ -119,17 +119,18 @@ int add_frame_to_window(frame frame, window* wdw)
   return 1;
 }
 
-void clean_window(char seq, window to_clean[], window removed[], size_t* len, int flags)
+void clean_window(uint8_t seq, window* to_clean, window* removed, int* len, int flags)
 {
   seq = get_seq(seq);
   int i = 0;
+  int j = 0;
   while (i < MAX_WINDOW_SIZE)
   {
     if (flags == RECV)
     {
       if (!is_empty_frame(to_clean[i].frame) && seq == to_clean[i].frame.seq)
       {
-        memcpy(&removed[*len], &to_clean[i], sizeof(window));
+        memcpy(&removed[*len] , &to_clean[i], sizeof(window)+1);
 	init_frame(&to_clean[i].frame);
         init_timer(&to_clean[i].timer);
         (*len)++;
@@ -151,7 +152,6 @@ void clean_window(char seq, window to_clean[], window removed[], size_t* len, in
   window temp[MAX_WINDOW_SIZE];
   init_window(temp);
  
-  int j; 
   for (i=0, j=0; i < MAX_WINDOW_SIZE; i++)
   {
     if (!is_empty_window(to_clean[i]))
@@ -227,13 +227,11 @@ int valid_frame(frame frame)
     }
   } else
     return 0;
-  {
-  }
 
   return 1;
 }
 
-void create_data_frame(char seq, char* data, uint16_t len, frame* frame)
+void create_data_frame(uint8_t seq, char* data, uint16_t len, frame* frame)
 {
   frame->type = 1;
   frame->window = 0;
@@ -246,7 +244,7 @@ void create_data_frame(char seq, char* data, uint16_t len, frame* frame)
   frame->crc = compute_crc(*frame);
 }
 
-void create_ack_frame(char seq, frame* frame)
+void create_ack_frame(uint8_t seq, frame* frame)
 {
   frame->type = 2;
   frame->window = MAX_WINDOW_SIZE - 1;
@@ -256,7 +254,7 @@ void create_ack_frame(char seq, frame* frame)
   frame->crc = compute_crc(*frame);
 }
 
-char get_seq(char seq)
+char get_seq(uint8_t seq)
 {
   return seq % (MAX_WINDOW_SIZE * 2);
 }

@@ -64,7 +64,7 @@ int main (int argc, char **argv)
   int sfd, s;
   struct sockaddr_storage peer_addr;
   socklen_t peer_addr_len;
-  char seq = 0;
+  uint8_t seq = 1;
   int nread;
   frame data, ack;
   char receiving[FRAME_SIZE];
@@ -79,7 +79,7 @@ int main (int argc, char **argv)
 
   s = getaddrinfo(NULL, port, &hints, &result);
   if (s != 0) {
-    fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+    printf("Error while getting network address\n");
     exit(EXIT_FAILURE);
   }
 
@@ -95,7 +95,7 @@ int main (int argc, char **argv)
 
   if (rp == NULL)
   {
-    fprintf(stderr, "Could not bind\n");
+    printf("Could not bind\n");
     return EXIT_FAILURE;
   }
 
@@ -107,42 +107,58 @@ int main (int argc, char **argv)
 
   /*START THREE WAY HANDSHAKE*/
   nread = recvfrom(sfd, receiving, sizeof(receiving), 9, (struct sockaddr*) &peer_addr, &peer_addr_len);
+  if (nread == -1)
+    printf("FAILED Reading ! \n");
+  unserialize(receiving, &data);
+//  printf("type: %d, window: %d, seq: %d, length: %d, crc: %d\n", data.type, data.window, data.seq, data.length, data.crc);
 
   create_ack_frame(data.seq + 1, &ack); 
   serialize(ack, sending);
+//  printf("ACK ! type: %d, window: %d, seq: %d, length: %d, crc: %d\n", ack.type, ack.window, ack.seq, ack.length, ack.crc);
   if (sendto(sfd, sending, nread, 0, (struct sockaddr *) &peer_addr, peer_addr_len) != nread)
-  {
-    fprintf(stderr, "Error sending response\n");
-  }
+    printf("Error sending response\n");
 
   nread = recvfrom(sfd, receiving, sizeof(receiving), 9, (struct sockaddr*) &peer_addr, &peer_addr_len);
+  if (nread == -1)
+    printf("FAILED Reading ! \n");
+  unserialize(receiving, &data);
+//  printf("type: %d, window: %d, seq: %d, length: %d, crc: %d\n", data.type, data.window, data.seq, data.length, data.crc);
+
+  seq = data.seq + 2;  
 
   /*START TRANSMISSION*/
   for(;;)
   {
+    bzero(&receiving, sizeof(receiving));
     nread = recvfrom(sfd, receiving, sizeof(receiving), 9, (struct sockaddr*) &peer_addr, &peer_addr_len);
-    
+    if (nread == -1)
+      printf("FAILED Reading ! \n");
     unserialize(receiving, &data);
+    printf("type: %d, window: %d, seq: %d, length: %d, crc: %d\n", data.type, data.window, data.seq, data.length, data.crc);
     if (valid_frame(data))
     {
       if (!frame_in_window(cache, data))
         add_frame_to_window(data, cache);
 
       create_ack_frame(seq, &ack); 
+//      printf("ACK ! type: %d, window: %d, seq: %d, length: %d, crc: %d\n", ack.type, ack.window, ack.seq, ack.length, ack.crc);
       serialize(ack, sending);
       if (sendto(sfd, sending, nread, 0, (struct sockaddr *) &peer_addr, peer_addr_len) != nread)
       {
         fprintf(stderr, "Error sending response\n");
       }
 
-      size_t len = 0; 
-      init_window(to_write);
-      clean_window(seq, cache, to_write,  &len, RECV);
+      int len = 0; 
       int i;
+
+      init_window(to_write);
+      clean_window(seq - 1, cache, to_write,  &len, RECV);
+      printf("seq: %d, len: %d\n", seq - 1, len);
       for (i=0; i<len ; i++)
       {
         frame temp = to_write[i].frame; 
-        if (fwrite(to_write[i].frame.payload, sizeof(char), temp.length, fd) != temp.length)
+//        printf("WRITING ! type: %d, window: %d, seq: %d, length: %d, crc: %d\n", temp.type, temp.window, temp.seq, temp.length, temp.crc);
+        if (fwrite(temp.payload, sizeof(char), temp.length, fd) != temp.length)
         {
           printf("Writing to file failed !\n");
           goto end;
@@ -151,7 +167,7 @@ int main (int argc, char **argv)
           goto end;
       }
       seq += len;
-    }
+    } 
   }
 
 end:

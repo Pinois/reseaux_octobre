@@ -93,7 +93,7 @@ int main (int argc, char **argv)
   int len = 0;
   int resend_len = 0;
   ssize_t nread = 0;
-  char seq = 0;
+  uint8_t seq = 0;
 
   srand(time(NULL));
   fd = (strcmp(file, "") == 0)?stdin:fopen(file,"r");
@@ -125,66 +125,51 @@ int main (int argc, char **argv)
 
   freeaddrinfo(result);
 
-  /*THREE WAY HANDSHAKE*/    
+  /*THREE WAY HANDSHAKE*/ 
   create_data_frame(seq, "", len, &data);
+  printf("type: %d, window: %d, seq: %d, length: %d, crc: %d\n", data.type, data.window, data.seq, data.length, data.crc);
   serialize(data, sending);
-  if (delay)
-    usleep(mili_delay);
   if (write(sfd, sending, sizeof(sending)) != sizeof(sending)) 
   {
-   // if (!(errno == EWOULDBLOCK || errno == EAGAIN))
-   // {
-      printf("writing to socket failed !\n");
-      return EXIT_FAILURE;
-   // }
-  }
-
-  nread = read(sfd, receiving, FRAME_SIZE);
- // if (!(errno == EWOULDBLOCK || errno == EAGAIN))
-//  {
-    if (nread == -1)
-    {
-      printf("Reading from socket failed !\n");
-      return EXIT_FAILURE;
-    }
-//  }
-  unserialize(sending, &ack);
-
-  create_data_frame(ack.seq, "", len, &data);
-  serialize(data, sending);
-  if (delay)
-    usleep(mili_delay);
-  if (write(sfd, sending, sizeof(sending)) != sizeof(sending)) 
-  {
-    printf("writing to socket failed !\n");
+     printf("writing to socket failed !\n");
     return EXIT_FAILURE;
   }
- 
-  /*START TRANSMISSION*/
-  fd_set rfds;
-  struct timeval tv;
-  int retval;
 
-  FD_ZERO(&rfds);
-  FD_SET(sfd, &rfds);
-  
-  tv.tv_sec = 0;
-  tv.tv_usec = 0;
-int h = 0;
+  nread = recv(sfd, receiving, FRAME_SIZE, 0);
+  if (nread == -1)
+  {
+    printf("Reading from socket failed !\n");
+    return EXIT_FAILURE;
+  }
+  unserialize(receiving, &ack);
+//  printf("ACK ! type: %d, window: %d, seq: %d, length: %d, crc: %d\n", ack.type, ack.window, ack.seq, ack.length, ack.crc);
+
+  create_data_frame(ack.seq, "", len, &data);
+//  printf("type: %d, window: %d, seq: %d, length: %d, crc: %d\n", data.type, data.window, data.seq, data.length, data.crc);
+  serialize(data, sending);
+  if (write(sfd, sending, sizeof(sending)) != sizeof(sending)) 
+  {
+      printf("writing to socket failed !\n");
+      return EXIT_FAILURE;
+  }
+ 
+  seq = data.seq + 1;
+
+/*START TRANSMISSION*/
   while((len = fread(buffer, sizeof(char),MAX_PAYLOAD_SIZE, fd)) != 0 )
-  { 
-        printf("INIT, %d\n",h);
+  {
+    bzero(&receiving, sizeof(receiving));
     create_data_frame(seq, buffer, len, &data);
-    if (is_free_window(wdw, MAX_WINDOW_SIZE))
+    if (is_free_window(wdw, MAX_WINDOW_SIZE - 1))
     {
+      printf("type: %d, window: %d, seq: %d, length: %d, crc: %d\n", data.type, data.window, data.seq, data.length, data.crc);
       if (rand()%1000 < sber)
         data.payload[0] ^= 0xFF; 
-      serialize(data, sending);
       if (delay)
         usleep(mili_delay);
-      if ((rand()%100) + 1 > splr)
+      if ((rand()%100) >= splr)
       {
-        printf("WRITE, %d\n",h);
+        serialize(data, sending);
         if (write(sfd, sending, sizeof(sending)) != sizeof(sending)) 
         {
           printf("writing to socket failed !\n");
@@ -195,32 +180,23 @@ int h = 0;
         add_frame_to_window(data, wdw);
     }
 
-    int ret = select(sfd + 1, &rfds, NULL, NULL, &tv);
-    if (ret == 0)
+    nread = recv(sfd, receiving, FRAME_SIZE, 0);
+    if (nread == -1)
     {
-      printf("ACK, %d\n",h);
-      nread = read(sfd, receiving, FRAME_SIZE);
-      printf("ACK2, %d\n",h);
-//      if (!(errno == EWOULDBLOCK || errno == EAGAIN))
-//      {
-        if (nread == -1)
-        {
-          printf("Reading from socket failed !\n");
-          return EXIT_FAILURE;
-        }
-//      }
-
-      unserialize(sending, &ack);
-      if(valid_frame(ack))
-      {
-        printf("ACK3, %d\n",h);
-        init_window(removed);
-        size_t rem_len = 0;
-        clean_window(ack.seq - 1, wdw, removed, &rem_len, SEND);
-      }
+      printf("Reading from socket failed !\n");
+      return EXIT_FAILURE;
+    }
+ 
+     unserialize(receiving, &ack);
+//    printf("ACK ! type: %d, window: %d, seq: %d, length: %d, crc: %d\n", ack.type, ack.window, ack.seq, ack.length, ack.crc);
+    if(valid_frame(ack))
+    {
+      init_window(removed);
+      int rem_len = 0;
+      clean_window(ack.seq - 1, wdw, removed, &rem_len, SEND);
+      printf("clean window !,seq: %d, rem_len: %d\n",ack.seq, rem_len);
     }
 
-        printf("BEFORE TIMER, %d\n",h);
     if (timer_reached(wdw, resend, &resend_len))
     {
       int i;
@@ -233,7 +209,6 @@ int h = 0;
           usleep(mili_delay);
         if ((rand()%100)+1 > splr)
         {
-          printf("RETRANSMISSION, %d\n",h);
           if (write(sfd, sending, sizeof(sending)) != sizeof(sending)) 
           {
             printf("writing to socket failed !\n");
@@ -243,10 +218,10 @@ int h = 0;
       }
     }
  
-    seq++;
-    h++;
-  }
 
+printf("seq: %d\n", seq);
+    seq++;
+  }
 
   close(sfd);
   fclose(fd);
