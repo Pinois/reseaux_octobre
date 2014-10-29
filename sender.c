@@ -127,7 +127,7 @@ int main (int argc, char **argv)
 
   /*THREE WAY HANDSHAKE*/ 
   create_data_frame(seq, "", len, &data);
-  printf("type: %d, window: %d, seq: %d, length: %d, crc: %d\n", data.type, data.window, data.seq, data.length, data.crc);
+//  printf("type: %d, window: %d, seq: %d, length: %d, crc: %d\n", data.type, data.window, data.seq, data.length, data.crc);
   serialize(data, sending);
   if (write(sfd, sending, sizeof(sending)) != sizeof(sending)) 
   {
@@ -162,7 +162,7 @@ int main (int argc, char **argv)
     create_data_frame(seq, buffer, len, &data);
     if (is_free_window(wdw, MAX_WINDOW_SIZE - 1))
     {
-      printf("type: %d, window: %d, seq: %d, length: %d, crc: %d\n", data.type, data.window, data.seq, data.length, data.crc);
+//      printf("type: %d, window: %d, seq: %d, length: %d, crc: %d\n", data.type, data.window, data.seq, data.length, data.crc);
       if (rand()%1000 < sber)
         data.payload[0] ^= 0xFF; 
       if (delay)
@@ -194,7 +194,7 @@ int main (int argc, char **argv)
       init_window(removed);
       int rem_len = 0;
       clean_window(ack.seq - 1, wdw, removed, &rem_len, SEND);
-      printf("clean window !,seq: %d, rem_len: %d\n",ack.seq, rem_len);
+//      printf("clean window !,seq: %d, rem_len: %d\n",ack.seq, rem_len);
     }
 
     if (timer_reached(wdw, resend, &resend_len))
@@ -217,14 +217,13 @@ int main (int argc, char **argv)
         }
       }
     }
- 
-
-printf("seq: %d\n", seq);
     seq++;
   }
 
   close(sfd);
   fclose(fd);
+  
+  printf("File transfered !\n");
   
   return EXIT_SUCCESS;
 }

@@ -41,7 +41,6 @@ int timer_reached(window* wdw, window* resend, int* len)
 
     if ((wdw[i].timer.timerid != 0) && (current_time - wdw[i].timer.timerid > MICROSEC_TIMEOUT))
     {
-    printf("TIMER REACHED INSIDE !\n");
       wdw[i].timer.counter++;
       memcpy(&resend[j],&wdw[i], sizeof(window));
       j++;

@@ -134,7 +134,7 @@ int main (int argc, char **argv)
     if (nread == -1)
       printf("FAILED Reading ! \n");
     unserialize(receiving, &data);
-    printf("type: %d, window: %d, seq: %d, length: %d, crc: %d\n", data.type, data.window, data.seq, data.length, data.crc);
+//    printf("type: %d, window: %d, seq: %d, length: %d, crc: %d\n", data.type, data.window, data.seq, data.length, data.crc);
     if (valid_frame(data))
     {
       if (!frame_in_window(cache, data))
@@ -145,7 +145,7 @@ int main (int argc, char **argv)
       serialize(ack, sending);
       if (sendto(sfd, sending, nread, 0, (struct sockaddr *) &peer_addr, peer_addr_len) != nread)
       {
-        fprintf(stderr, "Error sending response\n");
+        printf("Error sending response\n");
       }
 
       int len = 0; 
@@ -153,7 +153,7 @@ int main (int argc, char **argv)
 
       init_window(to_write);
       clean_window(seq - 1, cache, to_write,  &len, RECV);
-      printf("seq: %d, len: %d\n", seq - 1, len);
+//      printf("seq: %d, len: %d\n", seq - 1, len);
       for (i=0; i<len ; i++)
       {
         frame temp = to_write[i].frame; 
