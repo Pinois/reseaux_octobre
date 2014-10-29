@@ -125,9 +125,10 @@ int main (int argc, char **argv)
     unserialize(receiving, &data);
     if (valid_frame(data))
     {
-      add_frame_to_window(data, cache);
+      if (!frame_in_window(cache, data))
+        add_frame_to_window(data, cache);
 
-      create_ack_frame(data.seq + 1, &ack); 
+      create_ack_frame(seq, &ack); 
       serialize(ack, sending);
       if (sendto(sfd, sending, nread, 0, (struct sockaddr *) &peer_addr, peer_addr_len) != nread)
       {

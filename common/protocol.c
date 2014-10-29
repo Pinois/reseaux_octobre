@@ -4,6 +4,7 @@
 #include <string.h>
 #include <arpa/inet.h>
 #include <zlib.h>
+#include <sys/time.h>
 #include "protocol.h"
 
 static int is_empty_window(window window);
@@ -14,6 +15,42 @@ static void init_payload(char* payload);
 static void init_frame(frame* frame);
 static void init_timer(timer * timer);
 static uLong compute_crc(frame  frame);
+
+int frame_in_window(window* wdw, frame frm) 
+{
+  int i = 0;
+  while (i < MAX_WINDOW_SIZE)
+  {
+    if (memcmp(&wdw[i].frame, &frm, sizeof(frame)) == 0)
+      return 1;
+    i++;
+  }
+
+  return 0;
+}
+
+int timer_reached(window* wdw, window* resend, int* len)
+{
+  int i;
+  int j = 0;
+  for (i=0; i<MAX_WINDOW_SIZE; i++)
+  {
+    struct timeval tv;
+    gettimeofday(&tv,NULL);
+    uint64_t current_time = tv.tv_sec*(uint64_t)1000000+tv.tv_usec;
+
+    if ((wdw[i].timer.timerid != 0) && (current_time - wdw[i].timer.timerid > MICROSEC_TIMEOUT))
+    {
+    printf("TIMER REACHED INSIDE !\n");
+      wdw[i].timer.counter++;
+      memcpy(&resend[j],&wdw[i], sizeof(window));
+      j++;
+    }
+  }
+  *len = j;
+
+  return *len > 0;
+}
 
 int is_free_window(window* wdw, size_t len)
 {
@@ -74,6 +111,10 @@ int add_frame_to_window(frame frame, window* wdw)
     i--;
   }
   memcpy(&wdw[i].frame, &frame, sizeof (frame));
+
+  struct timeval tv;
+  gettimeofday(&tv,NULL);
+  wdw[i].timer.timerid = tv.tv_sec*(uint64_t)1000000+tv.tv_usec;
 
   return 1;
 }
@@ -160,29 +201,33 @@ void unserialize(char * data, frame *frame)
 
 int valid_frame(frame frame)
 {
-  //if (frame.crc != compute_crc(frame))
-  //{
-  //  return 0;
-  //}
+  if (frame.crc != compute_crc(frame))
+  {
+    return 0;
+  }
   
   if (frame.type ==  1)
   {
+    if (frame.length > MAX_PAYLOAD_SIZE)
+    {
+      return 0;
+    }
     if (frame.window != 0)
     {
       return 0;
     }
   } else if (frame.type == 2) {
-//    if (frame.length != 0)
-//    {
-//      return 0;
-//    }
-//    if (strlen(frame.payload) != 0)
-//    {
-//      return 0;
-//    }
-//  } else
-//    return 0;
-//  {
+    if (frame.length != 0)
+    {
+      return 0;
+    }
+    if (strlen(frame.payload) != 0)
+    {
+      return 0;
+    }
+  } else
+    return 0;
+  {
   }
 
   return 1;
@@ -223,8 +268,8 @@ void init_payload(char * payload)
 
 uLong compute_crc(frame frame)
 {
-  uLong crc = crc32(0L, Z_NULL, 0);
-  crc = crc32(crc, (Bytef*) &frame, sizeof(frame) - sizeof(crc));
+  uint32_t crc = crc32(0L, Z_NULL, 0);
+  crc = crc32(crc, (Bytef*) &frame, FRAME_SIZE - sizeof(frame.crc));
 
   return crc;
 }

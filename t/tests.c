@@ -44,6 +44,7 @@ START_TEST(test_frame_crc)
   create_data_frame(0, data, strlen(data), &frame2);
 
   ck_assert_int_eq(frame1.crc,frame2.crc);
+  ck_assert(valid_frame(frame1));
 END_TEST
 
 START_TEST(test_frame_serialization)
@@ -87,6 +88,8 @@ START_TEST(test_window)
   ck_assert(!is_free_window(wdw, 1));
   ck_assert(is_free_window(wdw, 2));
   ck_assert(add_frame_to_window(frame2, wdw));
+  ck_assert(frame_in_window(wdw, frame2));
+  ck_assert(!frame_in_window(wdw, frame3));
   ck_assert(add_frame_to_window(frame3, wdw));
   ck_assert(add_frame_to_window(frame6, wdw));
   ck_assert(add_frame_to_window(frame4, wdw));

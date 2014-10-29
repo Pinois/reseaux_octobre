@@ -11,6 +11,7 @@
 #define FRAME_SIZE 520
 #define RECV 0
 #define SEND 1
+#define MICROSEC_TIMEOUT 2 * 1000 * 1000
 
 typedef struct
 {
@@ -19,12 +20,12 @@ typedef struct
     char seq;
     uint16_t length;
     char payload [MAX_PAYLOAD_SIZE];
-    ulong crc;
+    uint32_t crc;
 }frame;
 
 typedef struct
 {
-    timer_t timerid;
+    uint64_t timerid;
     int counter;
 }timer;
 
@@ -46,10 +47,13 @@ extern void unserialize(char*, frame*);
 
 extern int is_free_window(window* window, size_t len);
 
+extern int frame_in_window(window* window, frame frame);
+
 extern int add_frame_to_window(frame frame, window* window);
 
 extern void clean_window(char seq, window* to_clean, window* removed , size_t* len, int flags);
 
+extern int timer_reached(window* wdw, window* resend, int* len);
 
 extern void init_window(window * window);
 

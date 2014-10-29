@@ -7,6 +7,8 @@
 #include <sys/time.h>
 #include <netdb.h>
 #include <unistd.h>
+#include <errno.h>
+//#include <fcntl.h>
 #include "common/protocol.h"
 
 static char file[256] = "";
@@ -15,6 +17,7 @@ static char port[8];
 static int sber = 0;
 static int splr = 0;
 static int delay = 0;
+static int mili_delay = 0;
 
 int main (int argc, char **argv)
 {
@@ -41,6 +44,7 @@ int main (int argc, char **argv)
           break;
         case 'd':
             delay = atoi(optarg);
+            mili_delay = delay * 1000;
           break;
         case 'p':
           splr = atoi(optarg);
@@ -84,11 +88,14 @@ int main (int argc, char **argv)
   char receiving[FRAME_SIZE];
   window wdw[MAX_WINDOW_SIZE];
   window removed[MAX_WINDOW_SIZE];
+  window resend[MAX_WINDOW_SIZE];
   FILE* fd;
   int len = 0;
+  int resend_len = 0;
   ssize_t nread = 0;
   char seq = 0;
 
+  srand(time(NULL));
   fd = (strcmp(file, "") == 0)?stdin:fopen(file,"r");
   init_window(wdw);
 
@@ -114,27 +121,39 @@ int main (int argc, char **argv)
     return EXIT_FAILURE;
   }
 
+  //fcntl(sfd, F_SETFL, O_NONBLOCK); 
+
   freeaddrinfo(result);
 
   /*THREE WAY HANDSHAKE*/    
   create_data_frame(seq, "", len, &data);
   serialize(data, sending);
+  if (delay)
+    usleep(mili_delay);
   if (write(sfd, sending, sizeof(sending)) != sizeof(sending)) 
   {
-    printf("writing to socket failed !\n");
-    return EXIT_FAILURE;
+   // if (!(errno == EWOULDBLOCK || errno == EAGAIN))
+   // {
+      printf("writing to socket failed !\n");
+      return EXIT_FAILURE;
+   // }
   }
 
   nread = read(sfd, receiving, FRAME_SIZE);
-  if (nread == -1)
-  {
-    printf("Reading from socket failed !\n");
-    return EXIT_FAILURE;
-  }
+ // if (!(errno == EWOULDBLOCK || errno == EAGAIN))
+//  {
+    if (nread == -1)
+    {
+      printf("Reading from socket failed !\n");
+      return EXIT_FAILURE;
+    }
+//  }
   unserialize(sending, &ack);
 
   create_data_frame(ack.seq, "", len, &data);
   serialize(data, sending);
+  if (delay)
+    usleep(mili_delay);
   if (write(sfd, sending, sizeof(sending)) != sizeof(sending)) 
   {
     printf("writing to socket failed !\n");
@@ -151,40 +170,81 @@ int main (int argc, char **argv)
   
   tv.tv_sec = 0;
   tv.tv_usec = 0;
-
+int h = 0;
   while((len = fread(buffer, sizeof(char),MAX_PAYLOAD_SIZE, fd)) != 0 )
-  {
-    // check timer and resend !
+  { 
+        printf("INIT, %d\n",h);
     create_data_frame(seq, buffer, len, &data);
     if (is_free_window(wdw, MAX_WINDOW_SIZE))
     {
+      if (rand()%1000 < sber)
+        data.payload[0] ^= 0xFF; 
       serialize(data, sending);
-      if (write(sfd, sending, sizeof(sending)) != sizeof(sending)) 
+      if (delay)
+        usleep(mili_delay);
+      if ((rand()%100) + 1 > splr)
       {
-        printf("writing to socket failed !\n");
-        return EXIT_FAILURE;
+        printf("WRITE, %d\n",h);
+        if (write(sfd, sending, sizeof(sending)) != sizeof(sending)) 
+        {
+          printf("writing to socket failed !\n");
+          return EXIT_FAILURE;
+        }
       }
-      add_frame_to_window(data, wdw);
+      if (!frame_in_window(wdw, data))
+        add_frame_to_window(data, wdw);
     }
-    if (select(sfd + 1, &rfds, NULL, NULL, &tv))
+
+    int ret = select(sfd + 1, &rfds, NULL, NULL, &tv);
+    if (ret == 0)
     {
+      printf("ACK, %d\n",h);
       nread = read(sfd, receiving, FRAME_SIZE);
-      if (nread == -1)
-      {
-        printf("Reading from socket failed !\n");
-        return EXIT_FAILURE;
-      }
+      printf("ACK2, %d\n",h);
+//      if (!(errno == EWOULDBLOCK || errno == EAGAIN))
+//      {
+        if (nread == -1)
+        {
+          printf("Reading from socket failed !\n");
+          return EXIT_FAILURE;
+        }
+//      }
 
       unserialize(sending, &ack);
       if(valid_frame(ack))
       {
+        printf("ACK3, %d\n",h);
         init_window(removed);
         size_t rem_len = 0;
         clean_window(ack.seq - 1, wdw, removed, &rem_len, SEND);
       }
     }
+
+        printf("BEFORE TIMER, %d\n",h);
+    if (timer_reached(wdw, resend, &resend_len))
+    {
+      int i;
+      for (i=0; i<resend_len; i++)
+      {
+        if (rand()%1000 < sber)
+          resend[i].frame.payload[0] ^= 0xFF; 
+        serialize(resend[i].frame, sending);
+        if (delay)
+          usleep(mili_delay);
+        if ((rand()%100)+1 > splr)
+        {
+          printf("RETRANSMISSION, %d\n",h);
+          if (write(sfd, sending, sizeof(sending)) != sizeof(sending)) 
+          {
+            printf("writing to socket failed !\n");
+            return EXIT_FAILURE;
+          }
+        }
+      }
+    }
  
     seq++;
+    h++;
   }
 
 
