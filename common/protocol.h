@@ -6,7 +6,7 @@
 #include <time.h>
 #include "../zlib/zlib.h" 
 
-#define MAX_WINDOW_SIZE 16 
+#define MAX_WINDOW_SIZE 32 
 #define MAX_PAYLOAD_SIZE 512
 #define FRAME_SIZE 520
 #define RECV 0
@@ -15,8 +15,8 @@
 
 typedef struct
 {
-    char type:3;
-    char window:5;
+    uint8_t type:3;
+    uint8_t window:5;
     uint8_t seq;
     uint16_t length;
     char payload [MAX_PAYLOAD_SIZE];

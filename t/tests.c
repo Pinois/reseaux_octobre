@@ -6,7 +6,7 @@ START_TEST(test_frame_create)
   frame frame;
   char data[MAX_PAYLOAD_SIZE] = "abcdefghijklmnopqrstuvwxyz";
 
-  create_data_frame(32, data, strlen(data), &frame);
+  create_data_frame(MAX_WINDOW_SIZE * 2, data, strlen(data), &frame);
   ck_assert_int_eq(frame.type,1);
   ck_assert_int_eq(frame.window,0);
   ck_assert_int_eq(frame.seq,0);
@@ -29,7 +29,7 @@ START_TEST(test_ack_create)
   create_ack_frame(20, &frame1);
 
   ck_assert_int_eq(frame1.type,2);
-  ck_assert_int_eq(frame1.window, 15);
+  ck_assert_int_eq(frame1.window, MAX_WINDOW_SIZE-1);
   ck_assert_int_eq(frame1.seq,20);
   ck_assert_int_eq(frame1.length,0);
   ck_assert_str_eq(frame1.payload,"");
@@ -80,8 +80,8 @@ START_TEST(test_window)
   create_data_frame(5, data, strlen(data), &frame5);
   create_data_frame(7, data, strlen(data), &frame6);
   ck_assert(is_free_window(wdw, 0));
-  ck_assert(is_free_window(wdw, 15));
-  ck_assert(!is_free_window(wdw, 16));
+  ck_assert(is_free_window(wdw, MAX_WINDOW_SIZE-1));
+  ck_assert(!is_free_window(wdw, MAX_WINDOW_SIZE));
   ck_assert(add_frame_to_window(frame1, wdw));
   ck_assert(!is_free_window(wdw, 0));
   ck_assert(is_free_window(wdw, 1));

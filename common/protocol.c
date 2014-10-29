@@ -10,7 +10,7 @@
 static int is_empty_window(window window);
 static int is_empty_frame(frame frame);
 static int is_empty_timer(timer timer);
-static char get_seq(uint8_t seq);
+static uint8_t get_seq(uint8_t seq);
 static void init_payload(char* payload);
 static void init_frame(frame* frame);
 static void init_timer(timer * timer);
@@ -169,13 +169,13 @@ void clean_window(uint8_t seq, window* to_clean, window* removed, int* len, int 
 
 void serialize(frame frame, char* data)
 {
-  char type = frame.type; 
+  uint8_t type = frame.type; 
   type <<= 5;
-  char window = frame.window;
-  char temp = type | window;
+  uint8_t window = frame.window;
+  uint8_t temp = type | window;
 
-  memcpy(data, &temp , sizeof(char));
-  memcpy(data +1, &frame.seq, sizeof(char));
+  memcpy(data, &temp , sizeof(uint8_t));
+  memcpy(data +1, &frame.seq, sizeof(uint8_t));
   memcpy(data + 2 , &frame.length, sizeof(frame.length));
 
   memcpy(data + 4, frame.payload, sizeof(frame.payload)+1); 
@@ -186,7 +186,7 @@ void serialize(frame frame, char* data)
 void unserialize(char * data, frame *frame)
 {
   char temp;
-  memcpy(&temp, data, sizeof(char));
+  memcpy(&temp, data, sizeof(uint8_t));
   frame->window = temp & 0x1F;
   
   temp >>= 5;
@@ -253,7 +253,7 @@ void create_ack_frame(uint8_t seq, frame* frame)
   frame->crc = compute_crc(*frame);
 }
 
-char get_seq(uint8_t seq)
+uint8_t get_seq(uint8_t seq)
 {
   return seq % (MAX_WINDOW_SIZE * 2);
 }
