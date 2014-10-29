@@ -116,30 +116,30 @@ int main (int argc, char **argv)
 
   freeaddrinfo(result);
 
-//  /*THREE WAY HANDSHAKE*/    
-//  create_data_frame(seq, "", len, &data);
-//  serialize(data, sending);
-//  if (write(sfd, sending, sizeof(sending)) != sizeof(sending)) 
-//  {
-//    printf("writing to socket failed !\n");
-//    return EXIT_FAILURE;
-//  }
-//
-//  nread = read(sfd, receiving, FRAME_SIZE);
-//  if (nread == -1)
-//  {
-//    printf("Reading from socket failed !\n");
-//    return EXIT_FAILURE;
-//  }
-//  unserialize(sending, &ack);
-//
-//  create_data_frame(ack.seq, "", len, &data);
-//  serialize(data, sending);
-//  if (write(sfd, sending, sizeof(sending)) != sizeof(sending)) 
-//  {
-//    printf("writing to socket failed !\n");
-//    return EXIT_FAILURE;
-//  }
+  /*THREE WAY HANDSHAKE*/    
+  create_data_frame(seq, "", len, &data);
+  serialize(data, sending);
+  if (write(sfd, sending, sizeof(sending)) != sizeof(sending)) 
+  {
+    printf("writing to socket failed !\n");
+    return EXIT_FAILURE;
+  }
+
+  nread = read(sfd, receiving, FRAME_SIZE);
+  if (nread == -1)
+  {
+    printf("Reading from socket failed !\n");
+    return EXIT_FAILURE;
+  }
+  unserialize(sending, &ack);
+
+  create_data_frame(ack.seq, "", len, &data);
+  serialize(data, sending);
+  if (write(sfd, sending, sizeof(sending)) != sizeof(sending)) 
+  {
+    printf("writing to socket failed !\n");
+    return EXIT_FAILURE;
+  }
  
   /*START TRANSMISSION*/
   fd_set rfds;

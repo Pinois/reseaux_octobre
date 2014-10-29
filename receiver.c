@@ -105,19 +105,17 @@ int main (int argc, char **argv)
 
   init_window(cache);
 
-//  /*START THREE WAY HANDSHAKE*/
-//  nread = recvfrom(sfd, receiving, sizeof(receiving), 9, (struct sockaddr*) &peer_addr, &peer_addr_len);
-//  unserialize(receiving, &data);
-//
-//  create_ack_frame(data.seq + 1, &ack); 
-//  serialize(ack, sending);
-//  if (sendto(sfd, sending, nread, 0, (struct sockaddr *) &peer_addr, peer_addr_len) != nread)
-//  {
-//    fprintf(stderr, "Error sending response\n");
-//  }
-//
-//  nread = recvfrom(sfd, receiving, sizeof(receiving), 9, (struct sockaddr*) &peer_addr, &peer_addr_len);
-//  unserialize(receiving, &data);
+  /*START THREE WAY HANDSHAKE*/
+  nread = recvfrom(sfd, receiving, sizeof(receiving), 9, (struct sockaddr*) &peer_addr, &peer_addr_len);
+
+  create_ack_frame(data.seq + 1, &ack); 
+  serialize(ack, sending);
+  if (sendto(sfd, sending, nread, 0, (struct sockaddr *) &peer_addr, peer_addr_len) != nread)
+  {
+    fprintf(stderr, "Error sending response\n");
+  }
+
+  nread = recvfrom(sfd, receiving, sizeof(receiving), 9, (struct sockaddr*) &peer_addr, &peer_addr_len);
 
   /*START TRANSMISSION*/
   for(;;)
