@@ -4,6 +4,7 @@
 #include <getopt.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <sys/time.h>
 #include <netdb.h>
 #include <unistd.h>
 #include "common/protocol.h"
@@ -72,6 +73,7 @@ int main (int argc, char **argv)
         return EXIT_FAILURE;
   }
   
+  /*INITIALISATION*/
   struct addrinfo hints;
   struct addrinfo *result, *rp;
   int sfd, s;
@@ -83,8 +85,8 @@ int main (int argc, char **argv)
   window wdw[MAX_WINDOW_SIZE];
   window removed[MAX_WINDOW_SIZE];
   FILE* fd;
-  int len;
-  ssize_t nread;
+  int len = 0;
+  ssize_t nread = 0;
   char seq = 0;
 
   fd = (strcmp(file, "") == 0)?stdin:fopen(file,"r");
@@ -114,6 +116,42 @@ int main (int argc, char **argv)
 
   freeaddrinfo(result);
 
+//  /*THREE WAY HANDSHAKE*/    
+//  create_data_frame(seq, "", len, &data);
+//  serialize(data, sending);
+//  if (write(sfd, sending, sizeof(sending)) != sizeof(sending)) 
+//  {
+//    printf("writing to socket failed !\n");
+//    return EXIT_FAILURE;
+//  }
+//
+//  nread = read(sfd, receiving, FRAME_SIZE);
+//  if (nread == -1)
+//  {
+//    printf("Reading from socket failed !\n");
+//    return EXIT_FAILURE;
+//  }
+//  unserialize(sending, &ack);
+//
+//  create_data_frame(ack.seq, "", len, &data);
+//  serialize(data, sending);
+//  if (write(sfd, sending, sizeof(sending)) != sizeof(sending)) 
+//  {
+//    printf("writing to socket failed !\n");
+//    return EXIT_FAILURE;
+//  }
+ 
+  /*START TRANSMISSION*/
+  fd_set rfds;
+  struct timeval tv;
+  int retval;
+
+  FD_ZERO(&rfds);
+  FD_SET(sfd, &rfds);
+  
+  tv.tv_sec = 0;
+  tv.tv_usec = 0;
+
   while((len = fread(buffer, sizeof(char),MAX_PAYLOAD_SIZE, fd)) != 0 )
   {
     // check timer and resend !
@@ -126,25 +164,29 @@ int main (int argc, char **argv)
         printf("writing to socket failed !\n");
         return EXIT_FAILURE;
       }
+      add_frame_to_window(data, wdw);
     }
-
-    nread = read(sfd, receiving, FRAME_SIZE);
-    if (nread == -1)
+    if (select(sfd + 1, &rfds, NULL, NULL, &tv))
     {
-      printf("Reading from socket failed !\n");
-      return EXIT_FAILURE;
+      nread = read(sfd, receiving, FRAME_SIZE);
+      if (nread == -1)
+      {
+        printf("Reading from socket failed !\n");
+        return EXIT_FAILURE;
+      }
+
+      unserialize(sending, &ack);
+      if(valid_frame(ack))
+      {
+        init_window(removed);
+        size_t rem_len = 0;
+        clean_window(ack.seq - 1, wdw, removed, &rem_len, SEND);
+      }
     }
  
     seq++;
   }
 
-  unserialize(sending, &ack);
-  if(valid_frame(ack))
-  {
-    init_window(removed);
-    size_t rem_len = 0;
-    clean_window(ack.seq - 1, wdw, removed, &rem_len, SEND);
-  }
 
   close(sfd);
   fclose(fd);

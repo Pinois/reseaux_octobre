@@ -58,11 +58,20 @@ int main (int argc, char **argv)
         return EXIT_FAILURE;
   }
 
+  /*INITIALISATION*/
   struct addrinfo hints;
   struct addrinfo *result, *rp;
   int sfd, s;
   struct sockaddr_storage peer_addr;
   socklen_t peer_addr_len;
+  char seq = 0;
+  int nread;
+  frame data, ack;
+  char receiving[FRAME_SIZE];
+  char sending[FRAME_SIZE];
+  window cache[MAX_WINDOW_SIZE];
+  window to_write[MAX_WINDOW_SIZE];
+  FILE * fd;
 
   memset(&hints, 0, sizeof(struct addrinfo));
   hints.ai_family = AF_INET6;
@@ -92,20 +101,27 @@ int main (int argc, char **argv)
 
   freeaddrinfo(result);
 
-  char seq = 0;
-  int nread;
-  char receiving[FRAME_SIZE];
-  char sending[FRAME_SIZE];
-  window cache[MAX_WINDOW_SIZE];
-  window to_write[MAX_WINDOW_SIZE];
-  FILE * fd;
-
   fd = (strcmp(file, "") == 0)?stdout:fopen(file,"w");
+
   init_window(cache);
 
+//  /*START THREE WAY HANDSHAKE*/
+//  nread = recvfrom(sfd, receiving, sizeof(receiving), 9, (struct sockaddr*) &peer_addr, &peer_addr_len);
+//  unserialize(receiving, &data);
+//
+//  create_ack_frame(data.seq + 1, &ack); 
+//  serialize(ack, sending);
+//  if (sendto(sfd, sending, nread, 0, (struct sockaddr *) &peer_addr, peer_addr_len) != nread)
+//  {
+//    fprintf(stderr, "Error sending response\n");
+//  }
+//
+//  nread = recvfrom(sfd, receiving, sizeof(receiving), 9, (struct sockaddr*) &peer_addr, &peer_addr_len);
+//  unserialize(receiving, &data);
+
+  /*START TRANSMISSION*/
   for(;;)
   {
-    frame data, ack;
     nread = recvfrom(sfd, receiving, sizeof(receiving), 9, (struct sockaddr*) &peer_addr, &peer_addr_len);
     
     unserialize(receiving, &data);
@@ -113,7 +129,7 @@ int main (int argc, char **argv)
     {
       add_frame_to_window(data, cache);
 
-      create_ack_frame(data.seq, &ack); 
+      create_ack_frame(data.seq + 1, &ack); 
       serialize(ack, sending);
       if (sendto(sfd, sending, nread, 0, (struct sockaddr *) &peer_addr, peer_addr_len) != nread)
       {
